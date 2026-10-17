@@ -1,69 +1,81 @@
-import Image from "next/image";
+const sampleCourses = [
+  {
+    code: "CS 245",
+    title: "Logic and Computation",
+    units: 0.5,
+    description: "Logic, proofs, and formal reasoning.",
+  },
+  {
+    code: "CS 246",
+    title: "Object-Oriented Software Development",
+    units: 0.5,
+    description: "Software design and development in C++.",
+  },
+  {
+    code: "MATH 239",
+    title: "Introduction to Combinatorics",
+    units: 0.5,
+    description: "Counting, graphs, and combinatorial structures.",
+  },
+];
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
+    <main className="min-h-screen bg-slate-950 text-white">
+      <header className="border-b border-slate-800 px-8 py-5">
+        <div className="mx-auto flex max-w-7xl items-center justify-between">
+          <h1 className="text-xl font-bold">
+            Termwise
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+
+          <nav className="flex gap-6 text-sm text-slate-300">
+            <a href="/">Courses</a>
+            <a href="/planner">My Planner</a>
+          </nav>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </header>
+
+      <section className="mx-auto max-w-7xl px-8 py-12">
+        <p className="text-sm text-blue-400">
+          YOUR ACADEMIC WORKSPACE
+        </p>
+
+        <h2 className="mt-3 text-4xl font-bold">
+          Plan your next term.
+        </h2>
+
+        <p className="mt-3 max-w-xl text-slate-400">
+          Explore courses, build schedules, and compare
+          alternative academic plans.
+        </p>
+
+        <div className="mt-8 grid gap-4 md:grid-cols-3">
+          {sampleCourses.map((course) => (
+            <article
+              key={course.code}
+              className="rounded-xl border border-slate-800
+                bg-slate-900 p-6"
+            >
+              <p className="text-sm text-blue-400">
+                {course.code}
+              </p>
+
+              <h3 className="mt-2 font-semibold">
+                {course.title}
+              </h3>
+
+              <p className="mt-3 text-sm text-slate-400">
+                {course.description}
+              </p>
+
+              <p className="mt-5 text-sm text-slate-300">
+                {course.units} units
+              </p>
+            </article>
+          ))}
         </div>
-      </main>
-    </div>
+        
+      </section>
+    </main>
   );
 }
