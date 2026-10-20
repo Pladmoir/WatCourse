@@ -1,0 +1,58 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Course {
+  id                         Int      @id @default(autoincrement())
+  courseId                   String   @unique
+  subjectCode                String
+  catalogNumber              String
+  title                      String
+  descriptionAbbreviated     String
+  description                String
+  associatedAcademicCareer   String
+  associatedAcademicGroupCode String
+  associatedAcademicOrgCode  String
+  gradingBasis               String
+  courseComponentCode        String
+  enrollConsentCode          String
+  enrollConsentDescription   String
+  dropConsentCode            String
+  dropConsentDescription     String
+  requirementsDescription    String?
+
+  offerings                  CourseOffering[]
+
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+
+  @@index([subjectCode, catalogNumber])
+}
+
+enum OfferingStatus {
+  OFFERED
+  NOT_FOUND
+}
+
+model CourseOffering {
+  id                Int    @id @default(autoincrement())
+  courseId          String
+  termCode          String
+  status            OfferingStatus
+  checkedAt         DateTime @default(now())
+
+  course Course @relation( fields: [courseId], references: [courseId], onDelete: Cascade)
+
+  @@unique([courseId, termCode])
+  @@index([termCode, status])
+}

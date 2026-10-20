@@ -1,255 +1,314 @@
+
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Course } from "@/types/course";
-import type { CourseOffering } from "@/types/course-offering";
-import type { TermAvailability } from "@/lib/course-offerings-helper";
+import type {
+  CourseOffering,
+  OfferingStatus,
+} from "@/types/course-offering";
 
 const TERMS = [
-    { termCode: "1261", termName: "Winter 2026" },
-    { termCode: "1265", termName: "Spring 2026" },
-    { termCode: "1269", termName: "Fall 2026" },
-
+  { code: "1261", label: "Winter 2026" },
+  { code: "1265", label: "Spring 2026" },
+  { code: "1269", label: "Fall 2026" },
 ];
 
-function getCourseKey(course: Course) {
-    return `${course.courseId}`;
-}
-
 export default function CoursesPage() {
-    const [courses, setCourses] = useState<Course[]>([]);
-    const [search, setSearch] = useState("");
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState("");
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [offerings, setOfferings] = useState<CourseOffering[]>([]);
 
-    const [expandedCourse, setExpandedCourse] = useState<string | null>(null);
-    const [offeringHistory, setOfferingHistory] = useState<
-        Record<string, TermAvailability[]>
-    >({});
-    const [historyLoading, setHistoryLoading] = useState<
-        Record<string, boolean>
-    >({});
+  const [search, setSearch] = useState("");
+  const [selectedTerm, setSelectedTerm] = useState("1269");
 
-    useEffect(() => {
-        async function loadCourses() {
-            try {
-                const response = await fetch("/api/courses?term=1269");
+  const [coursesLoading, setCoursesLoading] = useState(true);
+  const [offeringsLoading, setOfferingsLoading] = useState(false);
 
-                if (!response.ok) {
-                    throw new Error("Could not load courses.");
-                }
+  const [coursesError, setCoursesError] = useState<string | null>(null);
+  const [offeringsError, setOfferingsError] = useState<string | null>(null);
 
-                const data: Course[] = await response.json();
-                setCourses(data);
-            } catch {
-                setError("Failed to load courses. Please try again.");
-            } finally {
-                setLoading(false);
-            }
+  // Load the course catalogue.
+  // Use a fixed catalogue term so changing the selected term
+  // does not change the list of courses being searched.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCourses() {
+      setCoursesLoading(true);
+      setCoursesError(null);
+
+      try {
+        const response = await fetch("/api/courses?term=1269");
+
+        if (!response.ok) {
+          throw new Error("Failed to load courses.");
         }
 
-        loadCourses();
-    }, []);
+        const data: Course[] = await response.json();
 
-    async function loadOfferingHistory(course: Course) {
-        const key = getCourseKey(course);
-
-        // Don't fetch the same course's history repeatedly.
-        if (offeringHistory[key] || historyLoading[key]) {
-            return;
+        if (!cancelled) {
+          setCourses(data);
         }
-
-        setHistoryLoading((previous) => ({
-            ...previous,
-            [key]: true,
-        }));
-
-        try {
-            const results = await Promise.all(
-                TERMS.map(async (term): Promise<TermAvailability> => {
-                    try {
-                        const params = new URLSearchParams({
-                            courseId: String(course.courseId),
-                            term: term.termCode,
-                        });
-
-                        const response = await fetch(
-                            `/api/course-offerings?${params.toString()}`
-                        );
-
-
-                        if (!response.ok) {
-                            return { ...term, status: "not_found" };
-                        }
-
-                        const data: CourseOffering[] = await response.json();
-
-                        return {
-                            ...term,
-                            status: "offered",
-                        };
-                    } catch (error) {
-                        return { ...term, status: "not_found" };
-                    }
-                })
-            );
-
-            setOfferingHistory((previous) => ({
-                ...previous,
-                [key]: results,
-            }));
-        } finally {
-            setHistoryLoading((previous) => ({
-                ...previous,
-                [key]: false,
-            }));
+      } catch (error) {
+        if (!cancelled) {
+          setCoursesError(
+            error instanceof Error
+              ? error.message
+              : "An unexpected error occurred."
+          );
         }
+      } finally {
+        if (!cancelled) {
+          setCoursesLoading(false);
+        }
+      }
     }
 
-    function toggleHistory(course: Course) {
-        const key = getCourseKey(course);
+    loadCourses();
 
-        if (expandedCourse === key) {
-            setExpandedCourse(null);
-            return;
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Load saved SQL offering statuses for the selected term.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadOfferings() {
+      setOfferingsLoading(true);
+      setOfferingsError(null);
+      setOfferings([]);
+
+      try {
+        const response = await fetch(
+          `/api/course-offerings?term=${selectedTerm}`
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to load course offering statuses.");
         }
 
-        setExpandedCourse(key);
-        void loadOfferingHistory(course);
+        const data: CourseOffering[] = await response.json();
+
+        if (!cancelled) {
+          setOfferings(data);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setOfferingsError(
+            error instanceof Error
+              ? error.message
+              : "An unexpected error occurred."
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setOfferingsLoading(false);
+        }
+      }
     }
 
-    const filteredCourses = courses.filter((course) => {
-        const query = search.trim().toLowerCase();
+    loadOfferings();
 
-        if (!query) return true;
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedTerm]);
 
-        const subject = course.subjectCode.toLowerCase();
-        const catalog = course.catalogNumber.toLowerCase();
-        const courseCode = `${subject} ${catalog}`;
-
-        if (!query) return true;
-
-        if (query.includes(" ")) {
-            const firstSpaceIndex = query.indexOf(" ");
-            const querySubject = query.substring(0, firstSpaceIndex);
-            const queryCatalog = query.substring(firstSpaceIndex + 1).trim();
-
-            return (
-                subject === querySubject &&
-                catalog.startsWith(queryCatalog)
-            );
-        }
-
-        return courseCode.includes(query);
-    });
-
-    return (
-        <main className="mx-auto max-w-5xl p-8">
-            <h1 className="text-3xl font-bold">Course Explorer</h1>
-
-            <p className="mt-2 text-gray-500">
-                Explore courses offered at Waterloo.
-            </p>
-
-            <input
-                className="mt-6 w-full rounded-lg border p-3"
-                placeholder="Search by course code or title..."
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-            />
-
-            {loading && <p className="mt-6">Loading courses...</p>}
-
-            {error && <p className="mt-6 text-red-500">{error}</p>}
-
-            {!loading && !error && (
-                <p className="mt-4 text-sm text-gray-500">
-                    {filteredCourses.length} courses found
-                </p>
-            )}
-
-            <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                {filteredCourses.slice(0, 50).map((course) => {
-                    const key = getCourseKey(course);
-                    const isExpanded = expandedCourse === key;
-                    const history = offeringHistory[key];
-
-                    return (
-                        <article
-                            key={key}
-                            className="rounded-xl border p-5"
-                        >
-                            <p className="text-sm font-medium text-blue-600">
-                                {course.subjectCode} {course.catalogNumber}
-                            </p>
-
-                            <h2 className="mt-2 font-semibold">
-                                {course.title}
-                            </h2>
-
-                            {course.descriptionAbbreviated && (
-                                <p className="mt-2 text-sm text-gray-500">
-                                    {course.descriptionAbbreviated}
-                                </p>
-                            )}
-
-                            <button
-                                className="mt-4 rounded-lg border px-3 py-2 text-sm hover:bg-gray-50"
-                                onClick={() => toggleHistory(course)}
-                            >
-                                {isExpanded
-                                    ? "Hide offering history"
-                                    : "Show offering history"}
-                            </button>
-
-                            {isExpanded && (
-                                <div className="mt-4 border-t pt-3">
-                                    <h3 className="font-medium">
-                                        Recent offering history
-                                    </h3>
-
-                                    {historyLoading[key] && (
-                                        <p className="mt-2 text-sm text-gray-500">
-                                            Checking terms...
-                                        </p>
-                                    )}
-
-                                    {history && (
-                                        <ul className="mt-2 space-y-2">
-                                            {history.map((term) => (
-                                                <li
-                                                    key={term.termCode}
-                                                    className="flex items-center justify-between gap-3 text-sm"
-                                                >
-                                                    <span>{term.termName}</span>
-
-                                                    <span
-                                                        className={
-                                                            term.status === "offered"
-                                                                ? "text-green-700"
-                                                                : term.status === "not_found"
-                                                                    ? "text-gray-500"
-                                                                    : "text-amber-700"
-                                                        }
-                                                    >
-                                                        {term.status === "offered"
-                                                            ? "Offered"
-                                                            : term.status === "not_found"
-                                                                ? "No record found"
-                                                                : term.status === "unknown"
-                                                                    ? "Checking..."
-                                                                    : "Unavailable"}
-                                                    </span>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    )}
-                                </div>
-                            )}
-                        </article>
-                    );
-                })}
-            </div>
-        </main>
+  // Build a lookup so each course can find its status quickly.
+  const offeringByCourseId = useMemo(() => {
+    return new Map(
+      offerings.map((offering) => [
+        offering.courseId,
+        offering,
+      ])
     );
+  }, [offerings]);
+
+  // Search by subject, catalog number, title, or description.
+  const filteredCourses = useMemo(() => {
+    const query = search.trim().toLowerCase();
+
+    if (!query) {
+      return courses;
+    }
+
+    return courses.filter((course) => {
+      const searchableText = [
+        course.subjectCode,
+        course.catalogNumber,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return searchableText.includes(query);
+    });
+  }, [courses, search]);
+
+  function statusLabel(status: OfferingStatus | undefined) {
+    if (!status) {
+      return "Not checked";
+    }
+
+    return status === "OFFERED" ? "Offered" : "Not found";
+  }
+
+  return (
+    <main
+      style={{
+        maxWidth: "1000px",
+        margin: "0 auto",
+        padding: "32px 20px",
+      }}
+    >
+      <h1>Termwise Course Explorer</h1>
+
+      <p>
+        Search Waterloo courses and view their saved offering
+        status for each term.
+      </p>
+
+      <div
+        style={{
+          display: "flex",
+          gap: "12px",
+          flexWrap: "wrap",
+          margin: "24px 0",
+        }}
+      >
+        <input
+          type="text"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Search CS 136, algorithms, mathematics..."
+          aria-label="Search courses"
+          style={{
+            flex: "1",
+            minWidth: "220px",
+            padding: "12px",
+            border: "1px solid #888",
+            borderRadius: "6px",
+          }}
+        />
+
+        <select
+          value={selectedTerm}
+          onChange={(event) => setSelectedTerm(event.target.value)}
+          aria-label="Select academic term"
+          style={{
+            padding: "12px",
+            border: "1px solid #888",
+            borderRadius: "6px",
+          }}
+        >
+          {TERMS.map((term) => (
+            <option key={term.code} value={term.code}>
+              {term.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {coursesLoading && <p>Loading courses...</p>}
+
+      {coursesError && (
+        <p role="alert">Course error: {coursesError}</p>
+      )}
+
+      {offeringsLoading && (
+        <p>Loading offering statuses...</p>
+      )}
+
+      {offeringsError && (
+        <p role="alert">Offering error: {offeringsError}</p>
+      )}
+
+      {!coursesLoading && !coursesError && (
+        <>
+          <p>
+            Showing {filteredCourses.length} of {courses.length} courses
+          </p>
+
+          {filteredCourses.length === 0 ? (
+            <p>No courses match your search.</p>
+          ) : (
+            <div
+              style={{
+                display: "grid",
+                gap: "16px",
+                marginTop: "16px",
+              }}
+            >
+              {filteredCourses.map((course) => {
+                const offering = offeringByCourseId.get(
+                  course.courseId
+                );
+
+                const status = offering?.status;
+
+                return (
+                  <article
+                    key={course.courseId}
+                    style={{
+                      border: "1px solid #888",
+                      borderRadius: "8px",
+                      padding: "18px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-start",
+                        gap: "12px",
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <div>
+                        <h2 style={{ margin: "0 0 8px" }}>
+                          {course.subjectCode} {course.catalogNumber}
+                        </h2>
+
+                        <h3 style={{ margin: "0 0 12px" }}>
+                          {course.title}
+                        </h3>
+                      </div>
+
+                      <span>
+                        {statusLabel(status)}
+                      </span>
+                    </div>
+
+                    {course.descriptionAbbreviated && (
+                      <p>{course.descriptionAbbreviated}</p>
+                    )}
+
+                    <p>
+                      <strong>Term:</strong>{" "}
+                      {
+                        TERMS.find(
+                          (term) => term.code === selectedTerm
+                        )?.label
+                      }
+                    </p>
+
+                    {offering && (
+                      <p>
+                        <strong>Last checked:</strong>{" "}
+                        {new Date(
+                          offering.checkedAt
+                        ).toLocaleString()}
+                      </p>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+    </main>
+  );
 }

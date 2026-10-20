@@ -1,9 +1,9 @@
 export type AcademicTerm = "Fall" | "Winter" | "Spring";
+export type OfferingStatus = "OFFERED" | "NOT_FOUND";
 
 export interface CourseOffering {
   courseId: string;
-  courseOfferNumber: number;
   termCode: string;
-  termName: string;
-  term: AcademicTerm;
+  status: OfferingStatus;
+  checkedAt: string;
 }

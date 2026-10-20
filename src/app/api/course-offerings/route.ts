@@ -1,37 +1,51 @@
 import { NextResponse } from "next/server";
-import { uwFetch } from "@/lib/uw-fetch";
-import type { Course } from "@/types/course";
+import { prisma } from "@/lib/prisma";
+
+const VALID_TERMS = ["1261", "1265", "1269"];
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const courseId = searchParams.get("courseId");
-  const term = searchParams.get("term");
-
-  if (
-    !courseId ||
-    !term ||
-    !/^\d{4}$/.test(term)
-  ) {
-    return NextResponse.json(
-      {
-        error:
-          "Provide valid subject, catalogNumber, and term parameters.",
-      },
-      { status: 400 }
-    );
-  }
-
   try {
-    const courses = await uwFetch<Course[]>(
-      `/ClassSchedules/${term}/${courseId}`
-    );
+    const { searchParams } = new URL(request.url);
+    const termCode = searchParams.get("term");
 
-    return NextResponse.json(courses);
-  } catch (error) {
-    console.error("Course offering lookup failed:", error);
+    if (!termCode || !VALID_TERMS.includes(termCode)) {
+      return NextResponse.json(
+        {
+          error: "Invalid term. Use 1261, 1265, or 1269.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const offerings = await prisma.courseOffering.findMany({
+      where: {
+        termCode,
+      },
+      include: {
+        course: true,
+      },
+      orderBy: [
+        { course: { subjectCode: "asc" } },
+        { course: { catalogNumber: "asc" } },
+      ],
+    });
 
     return NextResponse.json(
-      { error: "Could not retrieve course data." },
+      offerings.map((offering) => ({
+        courseId: offering.courseId,
+        subjectCode: offering.course.subjectCode,
+        catalogNumber: offering.course.catalogNumber,
+        title: offering.course.title,
+        termCode: offering.termCode,
+        status: offering.status,
+        checkedAt: offering.checkedAt,
+      }))
+    );
+  } catch (error) {
+    console.error("Failed to fetch course offerings:", error);
+
+    return NextResponse.json(
+      { error: "Failed to fetch course offerings." },
       { status: 500 }
     );
   }
